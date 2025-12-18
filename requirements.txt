@@ -5,6 +5,7 @@ llama-index-embeddings-ollama>=0.1.0
 llama-index-llms-ollama>=0.1.0
 llama-index-llms-anthropic>=0.1.0
 llama-index-llms-gemini>=0.1.0
+llama-index-llms-openai>=0.1.0
 
 # Vector Database
 chromadb>=0.4.0

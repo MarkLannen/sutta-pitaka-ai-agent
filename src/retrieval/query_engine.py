@@ -7,16 +7,13 @@ from llama_index.core import PromptTemplate
 from llama_index.core.llms import LLM
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.response_synthesizers import get_response_synthesizer
-from llama_index.llms.ollama import Ollama
-from llama_index.llms.anthropic import Anthropic
-from llama_index.llms.gemini import Gemini
 
 from ..config import (
     OLLAMA_BASE_URL,
-    LOCAL_LLM,
-    ANTHROPIC_API_KEY,
-    GOOGLE_API_KEY,
     SIMILARITY_TOP_K,
+    ModelConfig,
+    get_model,
+    get_default_model,
 )
 from ..indexing import VectorStoreManager
 
@@ -56,6 +53,54 @@ class RAGResponse:
         return output
 
 
+def create_llm(model_config: ModelConfig) -> LLM:
+    """
+    Create an LLM instance from a ModelConfig.
+
+    Args:
+        model_config: Configuration for the model to create
+
+    Returns:
+        LlamaIndex LLM instance
+    """
+    provider = model_config.provider
+
+    if provider == "ollama":
+        from llama_index.llms.ollama import Ollama
+        return Ollama(
+            model=model_config.model_id,
+            base_url=OLLAMA_BASE_URL,
+            request_timeout=120.0,
+        )
+
+    elif provider == "anthropic":
+        from llama_index.llms.anthropic import Anthropic
+        import os
+        return Anthropic(
+            api_key=os.getenv("ANTHROPIC_API_KEY"),
+            model=model_config.model_id,
+        )
+
+    elif provider == "google":
+        from llama_index.llms.gemini import Gemini
+        import os
+        return Gemini(
+            api_key=os.getenv("GOOGLE_API_KEY"),
+            model=model_config.model_id,
+        )
+
+    elif provider == "openai":
+        from llama_index.llms.openai import OpenAI
+        import os
+        return OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model=model_config.model_id,
+        )
+
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+
+
 class RAGQueryEngine:
     """Query engine for the Pali Canon RAG system."""
 
@@ -79,7 +124,7 @@ Answer based on the suttas above:"""
     def __init__(
         self,
         vector_store: Optional[VectorStoreManager] = None,
-        model_type: str = "ollama",
+        model_id: Optional[str] = None,
         top_k: int = SIMILARITY_TOP_K,
     ):
         """
@@ -87,43 +132,25 @@ Answer based on the suttas above:"""
 
         Args:
             vector_store: VectorStoreManager instance (creates new one if None)
-            model_type: LLM to use - "ollama", "gemini", or "claude"
+            model_id: Model ID from config (uses default if None)
             top_k: Number of documents to retrieve
         """
         self.vector_store = vector_store or VectorStoreManager()
-        self.model_type = model_type
         self.top_k = top_k
 
-        # Initialize LLM based on type
-        self.llm = self._create_llm(model_type)
+        # Get model config
+        if model_id:
+            self.model_config = get_model(model_id)
+            if not self.model_config:
+                raise ValueError(f"Unknown model ID: {model_id}")
+        else:
+            self.model_config = get_default_model()
+
+        # Initialize LLM
+        self.llm = create_llm(self.model_config)
 
         # Create query engine
         self._query_engine = self._create_query_engine()
-
-    def _create_llm(self, model_type: str) -> LLM:
-        """Create the appropriate LLM based on model type."""
-        if model_type == "ollama":
-            return Ollama(
-                model=LOCAL_LLM,
-                base_url=OLLAMA_BASE_URL,
-                request_timeout=120.0,
-            )
-        elif model_type == "claude":
-            if not ANTHROPIC_API_KEY:
-                raise ValueError("ANTHROPIC_API_KEY not set in environment")
-            return Anthropic(
-                api_key=ANTHROPIC_API_KEY,
-                model="claude-3-5-sonnet-20241022",
-            )
-        elif model_type == "gemini":
-            if not GOOGLE_API_KEY:
-                raise ValueError("GOOGLE_API_KEY not set in environment")
-            return Gemini(
-                api_key=GOOGLE_API_KEY,
-                model="models/gemini-1.5-flash",
-            )
-        else:
-            raise ValueError(f"Unknown model type: {model_type}")
 
     def _create_query_engine(self) -> RetrieverQueryEngine:
         """Create the LlamaIndex query engine."""
@@ -144,16 +171,29 @@ Answer based on the suttas above:"""
             response_synthesizer=response_synthesizer,
         )
 
-    def switch_model(self, model_type: str) -> None:
+    def switch_model(self, model_id: str) -> None:
         """
         Switch to a different LLM.
 
         Args:
-            model_type: New model type - "ollama", "gemini", or "claude"
+            model_id: Model ID from config
         """
-        self.model_type = model_type
-        self.llm = self._create_llm(model_type)
+        model_config = get_model(model_id)
+        if not model_config:
+            raise ValueError(f"Unknown model ID: {model_id}")
+
+        if not model_config.is_available():
+            raise ValueError(
+                f"Model {model_config.display_name} requires {model_config.env_var} to be set"
+            )
+
+        self.model_config = model_config
+        self.llm = create_llm(model_config)
         self._query_engine = self._create_query_engine()
+
+    def get_current_model(self) -> ModelConfig:
+        """Get the currently active model config."""
+        return self.model_config
 
     def query(self, question: str) -> RAGResponse:
         """

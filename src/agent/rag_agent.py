@@ -2,6 +2,12 @@
 
 from typing import Optional
 
+from ..config import (
+    ModelConfig,
+    get_model,
+    get_default_model,
+    get_available_models,
+)
 from ..indexing import VectorStoreManager
 from ..retrieval import RAGQueryEngine
 
@@ -14,21 +20,15 @@ class PaliRAGAgent:
     model switching and query execution.
     """
 
-    AVAILABLE_MODELS = {
-        "ollama": "Local (Ollama - Free)",
-        "gemini": "Google Gemini 1.5 Flash",
-        "claude": "Anthropic Claude 3.5 Sonnet",
-    }
-
-    def __init__(self, model_type: str = "ollama"):
+    def __init__(self, model_id: Optional[str] = None):
         """
         Initialize the Pali RAG Agent.
 
         Args:
-            model_type: Initial model to use - "ollama", "gemini", or "claude"
+            model_id: Model ID to use (uses default if None)
         """
         self.vector_store = VectorStoreManager()
-        self.model_type = model_type
+        self.model_config = get_model(model_id) if model_id else get_default_model()
         self._query_engine: Optional[RAGQueryEngine] = None
 
     @property
@@ -37,7 +37,7 @@ class PaliRAGAgent:
         if self._query_engine is None:
             self._query_engine = RAGQueryEngine(
                 vector_store=self.vector_store,
-                model_type=self.model_type,
+                model_id=self.model_config.id,
             )
         return self._query_engine
 
@@ -49,19 +49,38 @@ class PaliRAGAgent:
         """Get number of indexed document chunks."""
         return self.vector_store.get_document_count()
 
-    def set_model(self, model_type: str) -> None:
+    @staticmethod
+    def get_available_models() -> list[ModelConfig]:
+        """Get all models that can be used (have valid credentials)."""
+        return get_available_models()
+
+    def get_current_model(self) -> ModelConfig:
+        """Get the currently selected model."""
+        return self.model_config
+
+    def set_model(self, model_id: str) -> None:
         """
         Switch to a different model.
 
         Args:
-            model_type: Model to switch to - "ollama", "gemini", or "claude"
-        """
-        if model_type not in self.AVAILABLE_MODELS:
-            raise ValueError(f"Unknown model: {model_type}")
+            model_id: ID of the model to switch to
 
-        self.model_type = model_type
+        Raises:
+            ValueError: If model ID is unknown or model is not available
+        """
+        model_config = get_model(model_id)
+        if not model_config:
+            raise ValueError(f"Unknown model: {model_id}")
+
+        if not model_config.is_available():
+            raise ValueError(
+                f"Model '{model_config.display_name}' requires "
+                f"{model_config.env_var} to be set in your environment"
+            )
+
+        self.model_config = model_config
         if self._query_engine is not None:
-            self._query_engine.switch_model(model_type)
+            self._query_engine.switch_model(model_id)
 
     def ask(self, question: str) -> dict:
         """
@@ -71,13 +90,14 @@ class PaliRAGAgent:
             question: User's question
 
         Returns:
-            Dictionary with 'answer', 'citations', and 'formatted' keys
+            Dictionary with 'answer', 'citations', 'formatted', and 'model' keys
         """
         if not self.is_ready():
             return {
                 "answer": "No suttas have been indexed yet. Please run the ingestion script first.",
                 "citations": [],
                 "formatted": "No suttas have been indexed yet. Please run the ingestion script first.",
+                "model": self.model_config.display_name,
             }
 
         response = self.query_engine.query(question)
@@ -95,6 +115,7 @@ class PaliRAGAgent:
                 for c in response.citations
             ],
             "formatted": response.format_with_sources(),
+            "model": self.model_config.display_name,
         }
 
     def search(self, query: str) -> list[dict]:

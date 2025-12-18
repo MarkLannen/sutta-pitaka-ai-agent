@@ -3,6 +3,7 @@
 import streamlit as st
 
 from src.agent import PaliRAGAgent
+from src.config import get_default_model
 
 
 # Page configuration
@@ -19,8 +20,8 @@ def init_session_state():
         st.session_state.agent = PaliRAGAgent()
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    if "model" not in st.session_state:
-        st.session_state.model = "ollama"
+    if "model_id" not in st.session_state:
+        st.session_state.model_id = get_default_model().id
 
 
 def render_sidebar():
@@ -28,28 +29,50 @@ def render_sidebar():
     with st.sidebar:
         st.title("Settings")
 
-        # Model selection
+        # Model selection - dynamically populated from config
         st.subheader("LLM Model")
-        model_options = {
-            "ollama": "Local (Ollama - Free)",
-            "gemini": "Gemini 1.5 Flash",
-            "claude": "Claude 3.5 Sonnet",
-        }
 
-        selected_model = st.selectbox(
-            "Choose model:",
-            options=list(model_options.keys()),
-            format_func=lambda x: model_options[x],
-            index=list(model_options.keys()).index(st.session_state.model),
-        )
+        available_models = st.session_state.agent.get_available_models()
 
-        if selected_model != st.session_state.model:
-            st.session_state.model = selected_model
-            try:
-                st.session_state.agent.set_model(selected_model)
-                st.success(f"Switched to {model_options[selected_model]}")
-            except ValueError as e:
-                st.error(str(e))
+        if not available_models:
+            st.error("No models available. Check Ollama or add API keys.")
+        else:
+            # Build options dict: id -> display_name
+            model_options = {m.id: m.display_name for m in available_models}
+
+            # Find current selection index
+            current_model_id = st.session_state.model_id
+            model_ids = list(model_options.keys())
+
+            if current_model_id not in model_ids:
+                current_model_id = model_ids[0]
+
+            current_index = model_ids.index(current_model_id)
+
+            selected_model_id = st.selectbox(
+                "Choose model:",
+                options=model_ids,
+                format_func=lambda x: model_options[x],
+                index=current_index,
+            )
+
+            # Show model description
+            current_model = next(
+                (m for m in available_models if m.id == selected_model_id), None
+            )
+            if current_model:
+                st.caption(current_model.description)
+                if current_model.is_free:
+                    st.caption("💚 Free (runs locally)")
+
+            # Handle model switch
+            if selected_model_id != st.session_state.model_id:
+                st.session_state.model_id = selected_model_id
+                try:
+                    st.session_state.agent.set_model(selected_model_id)
+                    st.success(f"Switched to {model_options[selected_model_id]}")
+                except ValueError as e:
+                    st.error(str(e))
 
         # Status
         st.divider()
@@ -60,7 +83,7 @@ def render_sidebar():
             st.success(f"Ready - {doc_count:,} chunks indexed")
         else:
             st.warning("No suttas indexed yet")
-            st.info("Run `python ingest.py` to index suttas")
+            st.info("Run `python ingest.py --nikaya mn` to index suttas")
 
         # Clear chat button
         st.divider()
@@ -113,7 +136,7 @@ def render_chat():
         # Generate response
         with st.chat_message("assistant"):
             if not st.session_state.agent.is_ready():
-                response_text = "No suttas have been indexed yet. Please run `python ingest.py` first."
+                response_text = "No suttas have been indexed yet. Please run `python ingest.py --nikaya mn` first."
                 st.markdown(response_text)
                 st.session_state.messages.append({
                     "role": "assistant",
@@ -121,7 +144,8 @@ def render_chat():
                     "citations": [],
                 })
             else:
-                with st.spinner("Searching suttas and generating response..."):
+                model_name = st.session_state.agent.get_current_model().display_name
+                with st.spinner(f"Searching suttas with {model_name}..."):
                     try:
                         result = st.session_state.agent.ask(prompt)
                         st.markdown(result["answer"])
