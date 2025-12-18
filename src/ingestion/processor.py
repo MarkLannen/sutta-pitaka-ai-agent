@@ -1,5 +1,6 @@
 """Document processor for converting sutta data into LlamaIndex Documents."""
 
+import json
 from typing import Iterator
 
 from llama_index.core.schema import Document
@@ -160,7 +161,7 @@ class DocumentProcessor:
             "title": sutta_metadata["title"],
             "translator": sutta_metadata["translator"],
             "segment_range": segment_range,
-            "segment_ids": segment_ids,  # Full list for detailed reference
+            "segment_ids": json.dumps(segment_ids),  # JSON string for ChromaDB compatibility
             "segment_count": len(segment_ids),
         }
 
