@@ -1,0 +1,17 @@
+# Core RAG Framework
+llama-index>=0.10.0
+llama-index-vector-stores-chroma>=0.1.0
+llama-index-embeddings-ollama>=0.1.0
+llama-index-llms-ollama>=0.1.0
+llama-index-llms-anthropic>=0.1.0
+llama-index-llms-gemini>=0.1.0
+
+# Vector Database
+chromadb>=0.4.0
+
+# Web UI
+streamlit>=1.30.0
+
+# Utilities
+requests>=2.31.0
+python-dotenv>=1.0.0
