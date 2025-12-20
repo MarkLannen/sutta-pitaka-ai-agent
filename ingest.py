@@ -123,7 +123,7 @@ def ingest_single_sutta(sutta_uid: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ingest Pali Canon suttas into the vector store",
+        description="Ingest Sutta Pitaka suttas into the vector store",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

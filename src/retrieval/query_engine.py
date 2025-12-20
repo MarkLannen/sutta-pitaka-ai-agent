@@ -102,9 +102,9 @@ def create_llm(model_config: ModelConfig) -> LLM:
 
 
 class RAGQueryEngine:
-    """Query engine for the Pali Canon RAG system."""
+    """Query engine for the Sutta Pitaka RAG system."""
 
-    SYSTEM_PROMPT = """You are a knowledgeable assistant specializing in Pali Canon Suttas.
+    SYSTEM_PROMPT = """You are a knowledgeable assistant specializing in Sutta Pitaka texts.
 Your role is to provide accurate, scholarly answers based on the sutta passages provided to you.
 
 Guidelines:
@@ -120,7 +120,7 @@ Guidelines:
 Example citation format:
 "The Buddha taught that suffering arises from craving (MN1). This is elaborated further in MN38, where..."
 
-Context from the Pali Canon:
+Context from the Sutta Pitaka:
 {context_str}
 
 Question: {query_str}
@@ -206,7 +206,7 @@ Provide a well-cited answer based on the suttas above:"""
         Query the RAG system.
 
         Args:
-            question: User's question about the Pali Canon
+            question: User's question about the Sutta Pitaka
 
         Returns:
             RAGResponse with answer and citations

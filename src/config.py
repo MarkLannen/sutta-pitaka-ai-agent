@@ -1,4 +1,4 @@
-"""Configuration settings for Pali Canon RAG Agent."""
+"""Configuration settings for Sutta Pitaka RAG Agent."""
 
 import os
 from dataclasses import dataclass

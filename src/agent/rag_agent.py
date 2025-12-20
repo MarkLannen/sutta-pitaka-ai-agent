@@ -1,4 +1,4 @@
-"""ReAct-style RAG agent for the Pali Canon."""
+"""ReAct-style RAG agent for the Sutta Pitaka."""
 
 from typing import Optional
 
@@ -14,7 +14,7 @@ from ..retrieval import RAGQueryEngine
 
 class SuttaPitakaRAGAgent:
     """
-    High-level agent interface for querying the Pali Canon.
+    High-level agent interface for querying the Sutta Pitaka.
 
     Provides a simple interface for the Streamlit app and handles
     model switching and query execution.
@@ -22,7 +22,7 @@ class SuttaPitakaRAGAgent:
 
     def __init__(self, model_id: Optional[str] = None):
         """
-        Initialize the Pali RAG Agent.
+        Initialize the Sutta Pitaka RAG Agent.
 
         Args:
             model_id: Model ID to use (uses default if None)
@@ -84,7 +84,7 @@ class SuttaPitakaRAGAgent:
 
     def ask(self, question: str) -> dict:
         """
-        Ask a question about the Pali Canon.
+        Ask a question about the Sutta Pitaka.
 
         Args:
             question: User's question

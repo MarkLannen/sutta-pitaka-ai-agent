@@ -50,7 +50,7 @@ class VectorStoreManager:
         # Get or create collection
         self.collection = self.chroma_client.get_or_create_collection(
             name=self.collection_name,
-            metadata={"description": "Pali Canon sutta embeddings"}
+            metadata={"description": "Sutta Pitaka embeddings"}
         )
 
         # Initialize vector store
@@ -109,7 +109,7 @@ class VectorStoreManager:
         self.chroma_client.delete_collection(self.collection_name)
         self.collection = self.chroma_client.create_collection(
             name=self.collection_name,
-            metadata={"description": "Pali Canon sutta embeddings"}
+            metadata={"description": "Sutta Pitaka embeddings"}
         )
         self.vector_store = ChromaVectorStore(
             chroma_collection=self.collection
