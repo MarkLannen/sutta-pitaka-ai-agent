@@ -145,11 +145,16 @@ def render_pali_tools():
                 counts = st.session_state.pali_search.count_occurrences(pali_term)
                 sorted_counts = sorted(counts.items(), key=lambda x: -x[1])
 
+                # Show first 15 results
                 for sutta_uid, count in sorted_counts[:15]:
                     st.write(f"**{sutta_uid}**: {count} occurrence{'s' if count != 1 else ''}")
 
+                # Show remaining results in expander
                 if len(sorted_counts) > 15:
-                    st.caption(f"... and {len(sorted_counts) - 15} more suttas")
+                    remaining = sorted_counts[15:]
+                    with st.expander(f"View all {len(sorted_counts)} suttas (+{len(remaining)} more)"):
+                        for sutta_uid, count in remaining:
+                            st.write(f"**{sutta_uid}**: {count} occurrence{'s' if count != 1 else ''}")
 
                 # Show sample matches
                 with st.expander("View Sample Matches"):
