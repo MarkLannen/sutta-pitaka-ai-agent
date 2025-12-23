@@ -133,6 +133,16 @@ For questions like "list all suttas about Y":
 3. Groups results by sutta (not by chunk)
 4. Shows relevance scores and snippet previews
 
+### Phase 10: Additional Dictionaries
+
+1. **English-to-Pali Dictionary**
+   - Find an existing English-to-Pali dictionary resource
+   - Integrate into Pali Tools UI
+
+2. **Dictionary of Pali Proper Names (DPPN)**
+   - Find and integrate a dictionary of Pali proper names
+   - Useful for looking up people, places, and concepts mentioned in suttas
+
 ---
 
 ## File Structure (Current)
