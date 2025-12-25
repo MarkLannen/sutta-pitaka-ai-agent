@@ -1,10 +1,12 @@
 # Sutta Pitaka AI Agent - Implementation Plan
 
-## Current State (as of Dec 22, 2024)
+## Current State (as of Dec 24, 2024)
 
 ### What's Working
-- ChromaDB vector store with 1,043 chunks from Majjhima Nikaya (152 suttas)
-- SuttaCentral API integration for fetching suttas
+- ChromaDB vector store with embeddings (**5,763 chunks from 4,050 suttas**)
+- SuttaCentral API integration with **dynamic sutta discovery**
+- **Full Sutta Pitaka ingestion support** (DN, MN, SN, AN, KN)
+- **Resume capability** for interrupted ingestion
 - Document processor for chunking suttas
 - **Iterative AI Agent** with multi-pass search and gap analysis
 - **Agent Memory** - persists learned insights in `agent_wisdom` collection
@@ -14,6 +16,18 @@
 - Multi-model support (Ollama, Anthropic, Google, OpenAI)
 - Dynamic retrieval: 5 chunks for local models, 20 for cloud models
 - Progress indicators during research phases
+
+### What Was Done (Dec 24)
+1. **Phase 1: Full Sutta Pitaka Ingestion** ✅
+   - Created `src/ingestion/sutta_discovery.py` - dynamic sutta discovery via API
+   - Created `src/ingestion/progress_tracker.py` - resume capability
+   - Updated `src/config.py` with ALL_NIKAYAS, KN_COLLECTIONS, ALL_COLLECTIONS
+   - Updated `src/ingestion/suttacentral.py` with discovery integration
+   - Updated `ingest.py` with extended CLI (`--all`, `--kn`, `--dry-run`, `--no-resume`)
+   - Fixed metadata size issue in `processor.py` (truncate long segment_ids)
+   - **4,050 suttas ingested** → **5,763 chunks** in vector store:
+     - DN: 34, MN: 152, SN: 1,819, AN: 1,408
+     - KN: kp(9), dhp(26), ud(80), iti(112), snp(73), thag(264), thig(73)
 
 ### What Was Done (Dec 22)
 1. **Phase 3 & 6: Iterative Agent with Memory** ✅
@@ -59,6 +73,17 @@
 
 ## Completed Phases
 
+### Phase 1: Extend Ingestion (Full Sutta Pitaka) ✅ DONE
+
+**Files created:** `src/ingestion/sutta_discovery.py`, `src/ingestion/progress_tracker.py`
+
+- ✅ Dynamic sutta discovery via SuttaCentral suttaplex API
+- ✅ Support for all nikayas (DN, MN, SN, AN) and KN collections
+- ✅ Resume capability for interrupted ingestion
+- ✅ Progress tracking in `cache/ingestion_progress/`
+- ✅ Extended CLI: `--all`, `--nikaya`, `--kn`, `--dry-run`, `--status`, `--clear-progress`
+- ✅ 4,050 suttas available (Sujato translations)
+
 ### Phase 2: Increase Retrieval Capacity ✅ DONE
 
 - ✅ Made top_k dynamic based on model type (5 for local, 20 for cloud)
@@ -100,7 +125,7 @@
 - ✅ Consolidated to single `SuttaPitakaAgent` class
 - ✅ Updated docstrings
 
-### Phase 9: Pali Dictionary & Term Search ✅ DONE (NEW)
+### Phase 9: Pali Dictionary & Term Search ✅ DONE
 
 **Files created:** `src/dictionary/pali_dictionary.py`, `src/dictionary/pali_search.py`
 
@@ -112,15 +137,6 @@
 ---
 
 ## Remaining Phases
-
-### Phase 1: Extend Ingestion (Ingest Full Sutta Pitaka)
-
-**Files to modify:** `src/config.py`, `ingest.py`, `src/ingestion/suttacentral.py`
-
-1. Add support for all nikayas (DN, SN, AN, KN)
-2. Implement **Recursive Character Splitting** in `processor.py` for formulaic text
-3. Add batch ingestion command: `python ingest.py --all`
-4. Estimate: ~5,400 suttas total, likely 30,000-50,000 chunks
 
 ### Phase 8: Search-Only Mode (For Counting Queries)
 
@@ -150,7 +166,7 @@ For questions like "list all suttas about Y":
 ```
 sutta-pitaka-ai-agent/
 ├── app.py                      # Streamlit UI (Chat + Pali Tools tabs)
-├── ingest.py                   # CLI for ingestion
+├── ingest.py                   # CLI for ingestion (extended)
 ├── .env                        # API keys
 ├── PLAN.md                     # This file
 ├── src/
@@ -162,11 +178,14 @@ sutta-pitaka-ai-agent/
 │   │   ├── __init__.py
 │   │   ├── pali_dictionary.py  # Pali-English dictionary
 │   │   └── pali_search.py      # Pali term search
-│   ├── config.py               # Settings
+│   ├── config.py               # Settings (incl. ALL_NIKAYAS, KN_COLLECTIONS)
 │   ├── indexing/
 │   │   └── vector_store.py     # ChromaDB
 │   ├── ingestion/
-│   │   ├── suttacentral.py     # API client
+│   │   ├── __init__.py
+│   │   ├── suttacentral.py     # API client with discovery
+│   │   ├── sutta_discovery.py  # Dynamic sutta discovery (NEW)
+│   │   ├── progress_tracker.py # Resume capability (NEW)
 │   │   └── processor.py        # Document chunking
 │   └── retrieval/
 │       └── query_engine.py     # Query engine
@@ -175,6 +194,7 @@ sutta-pitaka-ai-agent/
 │   └── agent_wisdom/           # Learned insights
 └── cache/
     ├── suttas/                 # Cached sutta JSON files
+    ├── ingestion_progress/     # Progress tracking (NEW)
     └── pali_dictionary.json    # Cached dictionary
 ```
 
@@ -195,6 +215,21 @@ streamlit run app.py
 # Check current ingestion status
 python ingest.py --status
 
+# Ingest the full Sutta Pitaka (with resume support)
+python ingest.py --all
+
+# Ingest a specific nikaya
+python ingest.py --nikaya sn
+
+# Ingest a sub-collection
+python ingest.py --nikaya sn12
+
+# Ingest a KN collection
+python ingest.py --kn snp
+
+# Dry run to see what would be ingested
+python ingest.py --dry-run --all
+
 # Stop streamlit when done
 pkill -f streamlit
 ```
@@ -203,18 +238,12 @@ pkill -f streamlit
 
 ## Next Steps (Priority Order)
 
-### 1. Full Sutta Pitaka Ingestion (Phase 1)
-- Extend SuttaCentral API client for DN, SN, AN, KN
-- Handle complex nested structures (SN, AN)
-- Batch ingest all ~5,400+ suttas
-- Pali term search will automatically work on new data
-
-### 2. Enhanced Search Mode (Phase 8)
+### 1. Enhanced Search Mode (Phase 8)
 - Add English semantic search with high top_k
 - Group results by sutta
 - UI toggle for "Research" vs "Search" mode
 
-### 3. Future Enhancements
+### 2. Future Enhancements
 - Metadata filtering (by nikaya, topic tags)
 - Export research results
 - Compare passages across suttas

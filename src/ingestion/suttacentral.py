@@ -3,7 +3,7 @@
 import json
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Generator, Callable
 
 import requests
 
@@ -12,7 +12,10 @@ from ..config import (
     CACHE_PATH,
     REQUEST_DELAY,
     NIKAYA_RANGES,
+    KN_COLLECTIONS,
 )
+from .sutta_discovery import SuttaDiscovery
+from .progress_tracker import ProgressTracker, IngestionProgress
 
 
 class SuttaCentralClient:
@@ -29,6 +32,8 @@ class SuttaCentralClient:
         self.translator = translator
         self.use_cache = use_cache
         self.cache_dir = CACHE_PATH / "suttas"
+        self.discovery = SuttaDiscovery(translator)
+        self.progress_tracker = ProgressTracker()
 
         if use_cache:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -88,7 +93,7 @@ class SuttaCentralClient:
 
     def fetch_nikaya(self, nikaya: str, progress_callback=None) -> list[dict]:
         """
-        Fetch all suttas from a nikaya.
+        Fetch all suttas from a nikaya (legacy method for simple nikayas).
 
         Args:
             nikaya: Nikaya code (e.g., "mn" for Majjhima Nikaya)
@@ -102,7 +107,7 @@ class SuttaCentralClient:
 
         sutta_range = NIKAYA_RANGES[nikaya]
         if sutta_range is None:
-            raise ValueError(f"Nikaya {nikaya} has complex structure, use fetch_sutta() directly")
+            raise ValueError(f"Nikaya {nikaya} has complex structure, use fetch_collection() instead")
 
         start, end = sutta_range
         suttas = []
@@ -124,6 +129,107 @@ class SuttaCentralClient:
                 time.sleep(REQUEST_DELAY)
 
         return suttas
+
+    def get_sutta_uids(self, collection: str) -> list[str]:
+        """
+        Get all sutta UIDs for a collection using dynamic discovery.
+
+        Args:
+            collection: Nikaya code ("dn", "mn", "sn", "an") or
+                       sub-collection ("sn12", "an1", "ud", "snp", etc.)
+
+        Returns:
+            List of sutta UIDs
+        """
+        return self.discovery.discover_nikaya(collection)
+
+    def fetch_collection(
+        self,
+        collection: str,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        resume: bool = True,
+    ) -> Generator[dict, None, None]:
+        """
+        Fetch all suttas from a collection with resume support.
+
+        Args:
+            collection: Nikaya code or sub-collection (e.g., "sn", "sn12", "ud")
+            progress_callback: Optional callback(current, total, uid) for progress
+            resume: Whether to resume from previous progress
+
+        Yields:
+            Sutta data dictionaries
+        """
+        # Discover all sutta UIDs
+        print(f"Discovering suttas in {collection}...")
+        sutta_uids = self.get_sutta_uids(collection)
+
+        if not sutta_uids:
+            print(f"No suttas found for {collection}")
+            return
+
+        print(f"Found {len(sutta_uids)} suttas")
+
+        # Initialize or resume progress
+        progress = self.progress_tracker.start_job(
+            collection,
+            sutta_uids,
+            force_new=not resume,
+        )
+
+        # Get remaining suttas
+        if resume and progress.completed_count > 0:
+            remaining = self.progress_tracker.get_remaining(progress, sutta_uids)
+            print(f"Resuming: {progress.completed_count} already done, {len(remaining)} remaining")
+        else:
+            remaining = sutta_uids
+
+        total = len(sutta_uids)
+        completed = progress.completed_count
+
+        for uid in remaining:
+            if progress_callback:
+                progress_callback(completed + 1, total, uid)
+
+            try:
+                sutta = self.fetch_sutta(uid)
+                if sutta:
+                    self.progress_tracker.mark_completed(progress, uid)
+                    completed += 1
+                    yield sutta
+                else:
+                    self.progress_tracker.mark_failed(progress, uid, "No data returned")
+            except Exception as e:
+                self.progress_tracker.mark_failed(progress, uid, str(e))
+                print(f"Error fetching {uid}: {e}")
+
+            # Rate limiting (only if not from cache)
+            if not self._get_cache_path(uid).exists():
+                time.sleep(REQUEST_DELAY)
+
+    def fetch_all(
+        self,
+        collections: Optional[list[str]] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+    ) -> Generator[dict, None, None]:
+        """
+        Fetch all suttas from multiple collections.
+
+        Args:
+            collections: List of collection codes. If None, fetches all.
+            progress_callback: Optional callback for progress updates
+
+        Yields:
+            Sutta data dictionaries
+        """
+        from ..config import ALL_COLLECTIONS
+
+        if collections is None:
+            collections = ALL_COLLECTIONS
+
+        for collection in collections:
+            print(f"\n--- Fetching {collection.upper()} ---")
+            yield from self.fetch_collection(collection, progress_callback)
 
     def get_sutta_metadata(self, sutta_data: dict) -> dict:
         """

@@ -155,13 +155,25 @@ class DocumentProcessor:
             segment_range = f"{sutta_uid}:{start_seg}-{end_seg}"
 
         # Build document metadata
+        # Limit segment_ids to avoid exceeding ChromaDB metadata size limits
+        segment_ids_json = json.dumps(segment_ids)
+        if len(segment_ids_json) > 500:
+            # Truncate to first and last few segments for reference
+            truncated_ids = segment_ids[:3] + ["..."] + segment_ids[-3:]
+            segment_ids_json = json.dumps(truncated_ids)
+
+        # Truncate title if too long
+        title = sutta_metadata["title"]
+        if len(title) > 200:
+            title = title[:197] + "..."
+
         doc_metadata = {
             "sutta_uid": sutta_metadata["sutta_uid"],
             "nikaya": sutta_metadata["nikaya"],
-            "title": sutta_metadata["title"],
+            "title": title,
             "translator": sutta_metadata["translator"],
             "segment_range": segment_range,
-            "segment_ids": json.dumps(segment_ids),  # JSON string for ChromaDB compatibility
+            "segment_ids": segment_ids_json,
             "segment_count": len(segment_ids),
         }
 

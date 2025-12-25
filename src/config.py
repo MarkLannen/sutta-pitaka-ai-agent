@@ -37,9 +37,18 @@ REQUEST_DELAY = 0.5  # Seconds between API requests to be polite
 NIKAYA_RANGES = {
     "mn": (1, 152),   # Majjhima Nikaya
     "dn": (1, 34),    # Digha Nikaya
-    "sn": None,       # Samyutta Nikaya (complex structure, handle separately)
-    "an": None,       # Anguttara Nikaya (complex structure, handle separately)
+    "sn": None,       # Samyutta Nikaya (complex structure, use discovery)
+    "an": None,       # Anguttara Nikaya (complex structure, use discovery)
 }
+
+# Main nikayas of the Sutta Pitaka
+ALL_NIKAYAS = ["dn", "mn", "sn", "an"]
+
+# Khuddaka Nikaya collections with Sujato translations
+KN_COLLECTIONS = ["kp", "dhp", "ud", "iti", "snp", "thag", "thig"]
+
+# All collections for ingestion
+ALL_COLLECTIONS = ALL_NIKAYAS + KN_COLLECTIONS
 
 
 # =============================================================================
